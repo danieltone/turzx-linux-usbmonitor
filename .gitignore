@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# local runtime logs/captures
+logs/
+*.pcap
+*.pcapng
+
+# editor/system
+.vscode/
+.DS_Store
+
+# vendor windows package excluded from repo
+Turing_Files_35/

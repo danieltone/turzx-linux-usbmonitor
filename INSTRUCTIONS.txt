@@ -1,0 +1,173 @@
+Turing 3.5" USB Monitor - Local Test Notes
+===========================================
+
+Purpose
+-------
+This directory contains a Python script for testing communication with the
+Turing USB monitor that enumerates as `/dev/ttyACM0`.
+
+Files
+-----
+- turing_usb_monitor_test.py  : Interactive + one-shot TX/RX tester with logging
+- logs/                       : Auto-created log directory
+- frames_example.txt          : Sample frame list for `--send-file` mode
+- summary_live_rates.py       : Watches summary CSV and prints live TX/RX rates
+- capture_usbmonitor.sh       : Captures USB monitor traffic with tshark/usbmon
+- extract_frames_from_pcap.py : Extracts candidate TX/RX payloads into frame files
+- display_text_test.py        : Direct text-to-screen test using discovered command IDs
+
+Quick Start
+-----------
+1) Install dependency:
+   python3 -m pip install --user pyserial
+
+2) Make script executable (optional):
+   chmod +x turing_usb_monitor_test.py
+
+3) Run:
+   ./turing_usb_monitor_test.py
+   or
+   python3 turing_usb_monitor_test.py
+
+4) Optional custom port/log file:
+   python3 turing_usb_monitor_test.py --port /dev/ttyACM0 --logfile ./logs/my_test.log
+
+5) One-shot mode (send once and exit):
+   python3 turing_usb_monitor_test.py --send "01 02 aa 55"
+
+6) One-shot mode with custom response window:
+   python3 turing_usb_monitor_test.py --send "01 02 aa 55" --rx-time 2.0
+
+7) Batch mode from file (one frame per line):
+   python3 turing_usb_monitor_test.py --send-file ./frames_example.txt --rx-time 1.0 --frame-delay 0.2
+
+8) Batch mode looped 10 times:
+   python3 turing_usb_monitor_test.py --send-file ./frames_example.txt --loop 10 --rx-time 0.5 --frame-delay 0.1
+
+9) Batch mode infinite loop (stop with Ctrl+C):
+   python3 turing_usb_monitor_test.py --send-file ./frames_example.txt --loop 0
+
+10) Diff-friendly timestamps (elapsed from run start):
+   python3 turing_usb_monitor_test.py --send-file ./frames_example.txt --timestamp-prefix elapsed
+
+11) Unix epoch timestamps:
+   python3 turing_usb_monitor_test.py --send "01 02 aa 55" --timestamp-prefix epoch
+
+12) Quiet console RX (still logged to file):
+   python3 turing_usb_monitor_test.py --send-file ./frames_example.txt --quiet-rx
+
+13) Nearly silent soak mode (TX+RX hidden, logs still written):
+   python3 turing_usb_monitor_test.py --send-file ./frames_example.txt --loop 0 --quiet-rx --quiet-tx
+
+14) Silent run with periodic heartbeat every 5 seconds:
+   python3 turing_usb_monitor_test.py --send-file ./frames_example.txt --loop 0 --quiet-rx --quiet-tx --summary-every 5
+
+15) Write heartbeat/final summaries to CSV:
+   python3 turing_usb_monitor_test.py --send-file ./frames_example.txt --loop 0 --summary-every 5 --summary-csv ./logs/summary.csv
+
+16) Daily CSV rotation (one file per day):
+   python3 turing_usb_monitor_test.py --send-file ./frames_example.txt --loop 0 --summary-every 5 --summary-csv ./logs/summary.csv --summary-csv-daily
+
+17) Live rate monitor for CSV summaries:
+   python3 summary_live_rates.py --csv-base ./logs/summary.csv --daily
+
+18) One-shot read of current CSV rows:
+   python3 summary_live_rates.py --csv-base ./logs/summary.csv --daily --once
+
+18b) Replay existing CSV history on startup (optional):
+   python3 summary_live_rates.py --csv-base ./logs/summary.csv --daily --replay-history
+
+19) Force color + custom alert thresholds:
+   python3 summary_live_rates.py --csv-base ./logs/summary.csv --daily --color always --rx-low 50 --rx-high 500000 --tx-low 10 --tx-high 500000
+
+Usage Notes
+-----------
+- Type bytes in hex at `TX>` prompt, e.g.:
+  01 02 aa 55
+- Type `quit` (or Ctrl+C) to exit.
+- RX/TX activity is printed and written to a timestamped log file.
+- One-shot mode logs TX/RX and exits automatically after `--rx-time` seconds.
+- Batch mode reads frames from a text file; blank lines and `# comments` are ignored.
+- `--send` and `--send-file` are mutually exclusive.
+- `--loop` only applies to `--send-file` (default `1`, and `0` means infinite).
+- `--timestamp-prefix` supports `wall` (default), `epoch`, and `elapsed`.
+- For comparing multiple runs, `--timestamp-prefix elapsed` is usually easiest.
+- `--quiet-rx` suppresses RX print spam in terminal, but RX is still saved to logs.
+- `--quiet-tx` suppresses TX/loop prints in terminal, but TX/loop is still saved to logs.
+- `--summary-every N` prints a periodic counter heartbeat (`TX/RX` totals), useful during quiet modes.
+- `--summary-csv PATH` appends summary rows to CSV (`periodic` and `final` rows).
+- `--summary-csv-daily` rotates CSV output to date-suffixed files (example: `summary_20260318.csv`).
+- `summary_live_rates.py` computes live rates from successive summary rows.
+- Use `--daily` in `summary_live_rates.py` when the tester uses `--summary-csv-daily`.
+- By default, `summary_live_rates.py` shows only newly appended rows after startup.
+- Use `--replay-history` if you want it to print existing rows from the current file first.
+- `summary_live_rates.py` supports alert coloring with `--color auto|always|never`.
+- Tune thresholds with `--rx-low/--rx-high` and `--tx-low/--tx-high` (bytes/sec).
+
+Protocol Discovery Workflow (Linux)
+-----------------------------------
+Goal: capture real traffic while the official Turing app is running, then turn
+that capture into `frames_probe.txt` for replay with `turing_usb_monitor_test.py`.
+
+1) Start USB capture (requires sudo):
+   sudo ./capture_usbmonitor.sh --outfile ./logs/usbcap_turing.pcapng
+
+2) While capture is running, use the official Turing software and trigger visible UI changes
+   (switch pages, update themes, etc.) for 20-60 seconds.
+
+3) Stop capture with Ctrl+C in the capture terminal.
+
+4) Extract payload frames from pcap:
+   python3 extract_frames_from_pcap.py --pcap ./logs/usbcap_turing.pcapng --unique --min-bytes 2 --out ./frames_probe.txt
+
+5) Replay extracted frames to the device:
+   python3 turing_usb_monitor_test.py --port /dev/ttyACM0 --send-file ./frames_probe.txt --loop 1 --rx-time 0.2 --frame-delay 0.02
+
+6) If extraction seems empty/wrong, try without device-address filtering:
+   python3 extract_frames_from_pcap.py --pcap ./logs/usbcap_turing.pcapng --all-devices --out ./frames_probe.txt
+
+Note: On Linux usbmon captures for this device, payload bytes may appear as
+`usbcom.data.out_payload` / `usbcom.data.in_payload` (not only `usb.capdata`).
+The extractor in this folder already handles those fields.
+
+Direct Text Display Test (Linux)
+--------------------------------
+This attempts direct screen rendering from Linux by creating a bitmap with text,
+converting to RGB565, and sending with command IDs found in the Windows app.
+
+1) Basic test sequence:
+   python3 display_text_test.py --port /dev/ttyACM0 --width 480 --height 320 --mode cmd197 --hold 1.5 TEST1 TEST2 TEST3
+
+2) Alternate mode (if cmd197 shows nothing):
+   python3 display_text_test.py --port /dev/ttyACM0 --width 480 --height 320 --mode cmd198 --hold 1.5 TEST1 TEST2 TEST3
+
+3) Optional colors:
+   python3 display_text_test.py --port /dev/ttyACM0 --mode cmd197 --bg 001020 --fg ffd700 TEST1
+
+Notes:
+- Generated PNGs are saved in `logs/` for verification.
+- If one mode works better than the other, keep using that mode.
+- `cmd194` is included for completeness but may be less stable depending on firmware.
+
+Session Log
+-----------
+Date: 2026-03-18
+- Confirmed device enumerates as USB CDC-ACM (`ttyACM0`)
+- Added interactive Python tester with persistent logging
+- Added one-shot CLI mode (`--send` + `--rx-time`) for repeatable protocol tests
+- Added batch replay mode (`--send-file` + `--frame-delay`) for multi-frame probing
+- Added looping support (`--loop`) for short or long soak tests
+- Added configurable timestamp prefix mode for easier cross-run log comparison
+- Added `--quiet-rx` to reduce terminal noise while preserving full RX logging
+- Added `--quiet-tx` for low-noise terminal output during long runs
+- Added `--summary-every` periodic heartbeat counters for long silent tests
+- Added `--summary-csv` output for graphing/analysis in spreadsheets
+- Added daily CSV rotation for multi-day captures (`--summary-csv-daily`)
+- Added `summary_live_rates.py` to tail summary CSV and print live TX/RX rates
+- Added colored throughput alerts and configurable thresholds in `summary_live_rates.py`
+- Added USB capture + frame extraction tools for protocol discovery workflow
+
+Add your own notes below:
+- 
+- 
+- 

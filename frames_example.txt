@@ -1,0 +1,7 @@
+# One frame per line, hex bytes separated by spaces
+# Lines starting with # are comments
+# Blank lines are ignored
+
+01 02 aa 55
+10 00 00 00
+ff 00 ff 00

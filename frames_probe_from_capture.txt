@@ -1,0 +1,16 @@
+# Auto-generated from USB capture
+# pcap=logs/usbcap_active.pcapng
+# meta=logs/usbcap_active.pcapng.meta
+# device_address=all
+# tx_frames=10
+
+0102aa55
+10000000
+ff00ff00
+0102aa55
+10000000
+ff00ff00
+0102aa55
+10000000
+ff00ff00
+0102aa55

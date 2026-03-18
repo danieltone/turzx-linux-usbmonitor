@@ -1,0 +1,6 @@
+# Auto-generated from USB capture
+# pcap=logs/usbcap_auto.pcapng
+# meta=logs/usbcap_auto.pcapng.meta
+# device_address=all
+# tx_frames=0
+
