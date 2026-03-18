@@ -32,6 +32,14 @@ Renders each message centered with automatic color rotation, then all three stac
 
 ---
 
+## Proof It Works
+
+![Turing 3.5" displaying TEST 1, TEST 2, TEST 3 text on Linux](turing35inch.png)
+
+*Actual hardware output: TEST 1, TEST 2, TEST 3 rendered via Linux Python script (no Windows app)*
+
+---
+
 ## What This Project Includes
 
 ### Working Scripts (✓ Tested on Linux)
